@@ -1,0 +1,71 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432" # Geliştirme sırasında pgAdmin ile erişim için
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:6-alpine
+    volumes:
+      - redisdata:/data
+    ports: # <--- BU SATIRLARI EKLE
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .  # Mevcut dizindeki Dockerfile'ı kullanarak imaj oluştur
+    ports:
+      - "8000:8000" # Bilgisayarımızın 8000 portunu container'ın 8000 portuna bağla
+    env_file:
+      - .env # .env dosyasındaki tüm değişkenleri container içine yükle
+    environment:
+      # Docker ağı içinde, API'nin veritabanına 'db' adıyla erişmesi gerekiyor.
+      # Bu yüzden .env'deki POSTGRES_SERVER=localhost ayarını eziyoruz (override).
+      POSTGRES_SERVER: db
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy # db servisi sağlıklı olana kadar bekle
+      redis:
+        condition: service_healthy # redis servisi sağlıklı olana kadar bekle
+    command: >
+      sh -c "alembic upgrade head && 
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  worker:
+    build: . # app servisi ile aynı imajı kullan
+    env_file:
+      - .env
+    environment:
+      POSTGRES_SERVER: db
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # app servisi de migration yaptığı için, app başladıktan sonra başlaması daha güvenli olabilir.
+      # Ama zorunlu değil çünkü worker migration yapmıyor.
+    command: ["rq", "worker", "--url", "redis://redis:6379/0", "default"] # YENİ
+
+volumes:
+  pgdata:
+  redisdata:
