@@ -1,30 +1,24 @@
 # app/crud/note.py
-from sqlalchemy.orm import Session
 from typing import List, Optional
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
-from app.models.note import Note, NoteStatus
-# Schemas'ı doğrudan import et, içinden spesifik isimleri değil.
-# Bu, döngüsel bağımlılık sorunlarını çözmeye yardımcı olabilir.
-from app import schemas
-# Python 3.10+ için Optional'ı import etmeye gerek yok ama eski sürümler için iyi bir pratik
-# from pydantic import BaseModel de ekleyelim
-from pydantic import BaseModel
+from app.models.note import Note
+from app.schemas.note import NoteCreate, NoteUpdate # Direct, explicit imports
 
 def get_note(db: Session, *, note_id: int) -> Optional[Note]:
     """
-    ID'ye göre bir notu getirir.
+    Retrieves a single note by its ID.
     """
     return db.query(Note).filter(Note.id == note_id).first()
 
 
 def get_notes_by_user(
-        db: Session, *, owner_id: int, skip: int = 0, limit: int = 100
+    db: Session, *, owner_id: int, skip: int = 0, limit: int = 100
 ) -> List[Note]:
     """
-    Belirli bir kullanıcıya ait notları listeler (sayfalama ile).
+    Retrieves a list of notes for a specific user, with pagination.
     """
-    # En son oluşturulan notun en üstte görünmesi için sıralama ekleyelim
     return (
         db.query(Note)
         .filter(Note.owner_id == owner_id)
@@ -37,7 +31,7 @@ def get_notes_by_user(
 
 def get_all_notes(db: Session, *, skip: int = 0, limit: int = 100) -> List[Note]:
     """
-    Tüm notları listeler (sadece adminler için kullanılacak).
+    Retrieves a list of all notes in the system, with pagination. (For admins)
     """
     return (
         db.query(Note)
@@ -48,35 +42,29 @@ def get_all_notes(db: Session, *, skip: int = 0, limit: int = 100) -> List[Note]
     )
 
 
-def create_note(db: Session, *, note_in: schemas.note.NoteCreate, owner_id: int) -> Note:
+def create_note(db: Session, *, note_in: NoteCreate, owner_id: int) -> Note:
     """
-    Belirli bir kullanıcı için yeni bir not oluşturur.
+    Creates a new note for a specific user.
     """
-    # note_in (Pydantic şeması) verilerini bir sözlüğe çeviriyoruz.
-    # Bu sözlük sadece 'raw_text' içeriyor olacak.
     db_note = Note(**note_in.dict(), owner_id=owner_id)
-
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
     return db_note
 
 
-# === GÜNCELLENMİŞ FONKSİYON ===
 def update_note(
-        db: Session, *, db_note: Note, note_in: schemas.note.NoteUpdate | dict
+    db: Session, *, db_note: Note, note_in: NoteUpdate | dict
 ) -> Note:
     """
-    Bir notu günceller. Hem Pydantic şeması hem de sözlük kabul eder.
-    Bu, worker'dan gelen güncellemeler için esneklik sağlar.
+    Updates a note's details. Accepts either a Pydantic schema or a dict.
+    This provides flexibility for updates coming from the API or background workers.
     """
-    # Gelen veriyi Pydantic modeli ise sözlüğe çevir
     if isinstance(note_in, BaseModel):
         update_data = note_in.dict(exclude_unset=True)
     else:
         update_data = note_in
 
-    # Mevcut db_note objesinin alanlarını gelen verilerle güncelle
     for field, value in update_data.items():
         setattr(db_note, field, value)
 
@@ -88,13 +76,10 @@ def update_note(
 
 def delete_note(db: Session, *, note_id: int) -> Optional[Note]:
     """
-    Bir notu siler. (Fonksiyonda değişiklik yok, sadece imza güncellendi)
+    Deletes a note from the database by its ID.
     """
-    db_note = db.query(Note).filter(Note.id == note_id).first()
-    if db_note:
-        db.delete(db_note)
+    note_to_delete = db.query(Note).filter(Note.id == note_id).first()
+    if note_to_delete:
+        db.delete(note_to_delete)
         db.commit()
-    return db_note
-
-
-
+    return note_to_delete

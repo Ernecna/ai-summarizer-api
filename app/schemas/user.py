@@ -1,53 +1,76 @@
 # app/schemas/user.py
+from __future__ import annotations
+from typing import List, Optional
 from pydantic import BaseModel, EmailStr
-from app.models.user import UserRole  # Modellerimizdeki Enum'ı kullanıyoruz
-from typing import List
+
+from app.models.user import UserRole
+# We will use a forward reference for NotePublic to avoid circular imports
 from app.schemas.note import NotePublic
 
-# --- Temel Şema ---
-# Diğer şemaların miras alacağı ortak alanları içerir.
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Base Schema
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 class UserBase(BaseModel):
+    """
+    Base schema for a user, containing common attributes.
+    """
     email: EmailStr
-    is_active: bool | None = True
+    is_active: Optional[bool] = True
 
 
-# --- İstek (Request) Şemaları ---
-# API'ye veri gönderilirken kullanılacak şemalar
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Schemas for API Request Bodies
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-# Yeni kullanıcı oluşturma (kayıt olma)
 class UserCreate(UserBase):
+    """
+    Schema for creating a new user (e.g., during registration).
+    """
     password: str
-    role: UserRole = UserRole.AGENT  # Varsayılan rol
+    role: UserRole = UserRole.AGENT
 
 
-# Admin tarafından kullanıcı güncellerken
 class UserUpdate(BaseModel):
-    email: EmailStr | None = None
-    password: str | None = None
-    is_active: bool | None = None
-    role: UserRole | None = None
+    """
+    Schema for updating an existing user. All fields are optional.
+    """
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    is_active: Optional[bool] = None
+    role: Optional[UserRole] = None
 
 
-# --- Veritabanı (Internal) Şeması ---
-# CRUD operasyonlarında kullanılacak, hashlenmiş şifreyi de içeren şema.
-# API'ye asla doğrudan dönülmemeli.
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Schemas for Internal Use (e.g., in CRUD operations)
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 class UserInDB(UserBase):
+    """
+    Schema representing a user as stored in the database, including hashed password.
+    This schema should NEVER be returned in an API response.
+    """
     id: int
     hashed_password: str
     role: UserRole
 
     class Config:
-        from_attributes = True  # SQLAlchemy modeli ile Pydantic'i eşleştirir
+        from_attributes = True
 
 
-# --- Yanıt (Response) Şeması ---
-# API'den dışarıya veri dönerken kullanılacak güvenli şema.
-# Şifre gibi hassas bilgileri içermez.
-# --- ŞİMDİ UserResponse'u GÜNCELLEYELİM ---
-class UserResponse(UserBase):
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Schemas for API Response Bodies
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+class UserPublic(UserBase):
+    """
+    Publicly available user information. This schema is safe to return in API responses.
+    It includes a list of the user's notes.
+    """
     id: int
     role: UserRole
-    notes: List[NotePublic] = []  # User'a ait notların listesi
+    notes: List[NotePublic] = []
 
     class Config:
         from_attributes = True

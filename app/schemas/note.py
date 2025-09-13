@@ -1,15 +1,20 @@
 # app/schemas/note.py
-from pydantic import BaseModel, Field, EmailStr
 from datetime import datetime
 from typing import Optional
-from app.models.note import NoteStatus  # Bu import kritik
+from pydantic import BaseModel, Field, EmailStr
+
+from app.models.note import NoteStatus
 
 
-# ===============================================================
-#  İÇ İÇE (NESTED) ŞEMALAR
-# ===============================================================
-# Notun sahibine dair herkese açık bilgiler
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Schemas for Nested Objects
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 class NoteOwnerPublic(BaseModel):
+    """
+    Publicly available information about a note's owner.
+    Used for nesting within the main NotePublic schema.
+    """
     id: int
     email: EmailStr
 
@@ -17,33 +22,39 @@ class NoteOwnerPublic(BaseModel):
         from_attributes = True
 
 
-# ===============================================================
-#  API İSTEK (REQUEST) GÖVDELERİ İÇİN ŞEMALAR
-# ===============================================================
-# POST /notes için kullanıcıdan alınacak tek bilgi
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Schemas for API Request Bodies
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 class NoteCreate(BaseModel):
+    """
+    Schema for creating a new note (request body for POST /notes).
+    """
     raw_text: str = Field(
         ...,
         min_length=50,
         max_length=5000,
-        description="Text to be summarized. Should be between 50 and 5000 characters."
+        description="Text to be summarized. Must be between 50 and 5000 characters."
     )
 
 
-# BİR NOTU GÜNCELLEME İSTEĞİ (PATCH /notes/{note_id})
-# Bu şemayı eklemeyi unutmuşuz. crud/note.py bu şemaya ihtiyaç duyuyor.
 class NoteUpdate(BaseModel):
+    """
+    Schema for updating a note (request body for PATCH /notes/{note_id}).
+    Used for admin purposes, like requeueing a failed task.
+    """
     raw_text: Optional[str] = Field(None, min_length=50, max_length=5000)
-    # Bir adminin FAILED durumundaki bir görevi yeniden QUEUED yapması gibi durumlar için:
-    status: Optional[NoteStatus] = None
+    status: Optional[NoteStatus] = Field(None, description="New status for the note.")
 
 
-# ===============================================================
-#  API YANIT (RESPONSE) GÖVDELERİ İÇİN ŞEMALAR
-# ===============================================================
-# GET /notes/{id} veya POST /notes yanıtı olarak dönecek olan,
-# herkese açık ve zenginleştirilmiş Not bilgisi.
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Schemas for API Response Bodies
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 class NotePublic(BaseModel):
+    """
+    The definitive public representation of a Note object in API responses.
+    """
     id: int = Field(description="Unique ID of the note.")
     status: NoteStatus = Field(description="Current status of the summarization task.")
     raw_text: str = Field(description="The original text provided by the user.")

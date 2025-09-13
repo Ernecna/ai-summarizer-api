@@ -1,5 +1,6 @@
 # docker-compose.yml
-version: '3.8'
+# Defines the multi-container application environment for local development.
+# This file is NOT used by Koyeb for deployment.
 
 services:
   db:
@@ -11,10 +12,10 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432" # Geliştirme sırasında pgAdmin ile erişim için
+      - "5432:5432" # Expose port for local tools like pgAdmin
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
 
@@ -22,50 +23,58 @@ services:
     image: redis:6-alpine
     volumes:
       - redisdata:/data
-    ports: # <--- BU SATIRLARI EKLE
-      - "6379:6379"
+    ports:
+      - "6379:6379" # Expose port for local debugging if needed
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
 
   app:
-    build: .  # Mevcut dizindeki Dockerfile'ı kullanarak imaj oluştur
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "8000:8000" # Bilgisayarımızın 8000 portunu container'ın 8000 portuna bağla
+      - "8000:8000"
     env_file:
-      - .env # .env dosyasındaki tüm değişkenleri container içine yükle
+      - .env
     environment:
-      # Docker ağı içinde, API'nin veritabanına 'db' adıyla erişmesi gerekiyor.
-      # Bu yüzden .env'deki POSTGRES_SERVER=localhost ayarını eziyoruz (override).
+      # Override POSTGRES_SERVER from .env to use the Docker service name
       POSTGRES_SERVER: db
       REDIS_URL: redis://redis:6379/0
+      ENV_STATE: dev # Specify environment to ensure config loads .env
     depends_on:
       db:
-        condition: service_healthy # db servisi sağlıklı olana kadar bekle
+        condition: service_healthy
       redis:
-        condition: service_healthy # redis servisi sağlıklı olana kadar bekle
+        condition: service_healthy
     command: >
       sh -c "alembic upgrade head && 
-             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   worker:
-    build: . # app servisi ile aynı imajı kullan
+    build:
+      context: .
+      dockerfile: Dockerfile
     env_file:
       - .env
     environment:
       POSTGRES_SERVER: db
       REDIS_URL: redis://redis:6379/0
+      ENV_STATE: dev
+      # For Windows compatibility in local dev, we might need a simple worker.
+      # However, the container runs on Linux, so the default worker is fine.
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      # app servisi de migration yaptığı için, app başladıktan sonra başlaması daha güvenli olabilir.
-      # Ama zorunlu değil çünkü worker migration yapmıyor.
-    command: ["rq", "worker", "--url", "redis://redis:6379/0", "default"] # YENİ
+    # Use the environment variable for the Redis URL to keep it DRY
+    command: sh -c "rq worker --url $$REDIS_URL default"
 
 volumes:
   pgdata:
+    driver: local
   redisdata:
+    driver: local

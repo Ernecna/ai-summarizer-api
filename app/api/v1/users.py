@@ -1,4 +1,5 @@
 # app/api/v1/users.py
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -6,27 +7,40 @@ from app.core.dependencies import get_db, get_current_active_user, get_current_a
 from app.crud import user as crud_user
 from app.models.user import User
 from app.schemas import user as user_schema
-from typing import List
 
 router = APIRouter()
 
 
-@router.get("/me", response_model=user_schema.UserResponse)
-def read_users_me(current_user: User = Depends(get_current_active_user)):
+@router.get("/me", response_model=user_schema.UserPublic)
+def read_current_user(current_user: User = Depends(get_current_active_user)):
     """
-    Mevcut giriş yapmış kullanıcının bilgilerini getirir.
+    Get the profile of the currently logged-in user.
     """
     return current_user
 
 
-@router.get("/{user_id}", response_model=user_schema.UserResponse)
+@router.get("/", response_model=List[user_schema.UserPublic])
+def list_users(
+        skip: int = 0,
+        limit: int = 100,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Retrieve a list of users. (Admins only)
+    """
+    users = crud_user.get_users(db, skip=skip, limit=limit)
+    return users
+
+
+@router.get("/{user_id}", response_model=user_schema.UserPublic)
 def read_user_by_id(
         user_id: int,
         db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_admin_user),  # Sadece adminler erişebilir
+        current_user: User = Depends(get_current_admin_user),
 ):
     """
-    ID'ye göre bir kullanıcıyı getirir (Admin yetkisi gerektirir).
+    Get a specific user by their ID. (Admins only)
     """
     user = crud_user.get_user(db, user_id=user_id)
     if not user:
@@ -34,26 +48,27 @@ def read_user_by_id(
     return user
 
 
-@router.get("/", response_model=List[user_schema.UserResponse])
-def read_users(
-        skip: int = 0,
-        limit: int = 100,
+@router.delete("/{user_id}", response_model=user_schema.UserPublic)
+def delete_user_by_id(
+        user_id: int,
         db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_admin_user),  # <-- Sadece adminler!
+        current_user: User = Depends(get_current_admin_user),
 ):
     """
-    Kullanıcıların bir listesini getirir (Admin yetkisi gerektirir).
+    Delete a specific user by their ID. (Admins only)
     """
-    users = crud_user.get_users(db, skip=skip, limit=limit)
-    return users
+    user_to_delete = crud_user.get_user(db, user_id=user_id)
+    if not user_to_delete:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
 
+    if current_user.id == user_to_delete.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Admins cannot delete their own account.",
+        )
 
-def delete_user(db: Session, *, user_id: int) -> User | None:
-    """
-    ID'si verilen bir kullanıcıyı veritabanından siler.
-    """
-    user_to_delete = db.query(User).filter(User.id == user_id).first()
-    if user_to_delete:
-        db.delete(user_to_delete)
-        db.commit()
-    return user_to_delete
+    deleted_user = crud_user.delete_user(db, user_id=user_id)
+    return deleted_user

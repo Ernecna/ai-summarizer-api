@@ -6,8 +6,10 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
-# User rolleri için bir Enum tanımlıyoruz.
 class UserRole(str, enum.Enum):
+    """
+    Enum for the possible roles a user can have.
+    """
     ADMIN = "ADMIN"
     AGENT = "AGENT"
 
@@ -20,9 +22,10 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
 
-    # Rol sütununu Enum tipinde ve varsayılan değeri AGENT olarak ekliyoruz.
-    # Yeni kaydolan her kullanıcı, biz aksini belirtmedikçe otomatik olarak AGENT olacak.
+    # The 'role' column uses the Enum type with a default value of AGENT.
+    # Every new user will automatically be an AGENT unless specified otherwise.
     role = Column(Enum(UserRole), default=UserRole.AGENT, nullable=False)
 
-    # İlişki tanımı (değişiklik yok)
+    # Establishes a one-to-many relationship: one User can have many Notes.
+    # 'back_populates' creates a bidirectional link with the 'owner' relationship in the Note model.
     notes = relationship("Note", back_populates="owner")

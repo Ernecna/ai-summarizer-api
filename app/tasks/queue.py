@@ -1,15 +1,15 @@
+# app/tasks/queue.py
 from redis import Redis
 from rq import Queue
 
 from app.core.config import settings
 
-# 1. Redis'e Bağlan
-# .env dosyasından okuduğumuz REDIS_URL'yi kullanarak Redis'e bağlanıyoruz.
-# decode_responses=True parametresini, RQ belgelerine göre DESTEKLENMEDİĞİ için kaldırıyoruz.
-redis_conn = Redis.from_url(settings.REDIS_URL) # <--- DEĞİŞİKLİK BURADA
+# Establish a connection to the Redis server using the URL from settings.
+# Note: decode_responses=True is NOT used, as RQ expects bytes.
+redis_conn = Redis.from_url(settings.REDIS_URL)
 
-# 2. Bir RQ Kuyruğu (Queue) Oluştur
-# Bağlantıyı açıkça (explicitly) connection parametresi ile veriyoruz.
-# is_async'i False yapmak, geliştirme sırasında daha öngörülebilir olabilir.
-# Production için True kalması daha performanslıdır. Şimdilik True bırakalım.
-q = Queue("default", connection=redis_conn, is_async=True)
+# Create a Redis Queue instance named 'default'.
+# This 'q' object is the main entry point for enqueueing background jobs
+# from anywhere in the application (e.g., from an API endpoint).
+# The connection is passed explicitly, which is the recommended practice.
+q = Queue("default", connection=redis_conn)

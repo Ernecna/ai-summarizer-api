@@ -1,13 +1,19 @@
 # app/schemas/token.py
+from typing import Optional
 from pydantic import BaseModel
 
 
 class Token(BaseModel):
+    """
+    Schema for the JWT access token response.
+    """
     access_token: str
-    token_type: str
+    token_type: str = "bearer"
 
 
 class TokenData(BaseModel):
-    # Bu şema, JWT token'ın içine gömdüğümüz verinin yapısını temsil eder.
-    # Şimdilik sadece email yeterli, ileride roller veya izinler de eklenebilir.
-    email: str | None = None
+    """
+    Schema for the data embedded within a JWT token (the payload).
+    """
+    # Using Optional[str] is compatible with older Python versions
+    email: Optional[str] = None
