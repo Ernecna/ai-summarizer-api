@@ -11,7 +11,7 @@ SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 # pool_pre_ping=True, veritabanı bağlantılarının havuzdan alınmadan önce
 # hala aktif olup olmadığını kontrol eder. Bu, bağlantı kopması
 # gibi sorunları önler.
-engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
+engine = create_engine("SQLALCHEMY_DATABASE_URL", pool_pre_ping=True)
 
 # Veritabanı oturumları (session) oluşturmak için bir fabrika (factory)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

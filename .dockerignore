@@ -1,14 +1,15 @@
-# .dockerignore
-venv/
-.venv/
+.git
 __pycache__/
 *.pyc
-.git/
-.gitignore
-.dockerignore
-Dockerfile
-docker-compose.yml
-.idea/
-.vscode/
-.DS_Store
-model_cache/
+*.pyo
+*.pyd
+*.log
+.env
+.venv
+venv/
+.cache/
+data/
+models/
+*.pt
+*.bin
+*.safetensors
