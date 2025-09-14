@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = Field(..., env="REDIS_URL")
 
     class Config:
-        env_file = ".env"  # <--- BU SATIRI SİL VEYA YORUM SATIRI YAP!!!
+        #env_file = ".env"  # <--- BU SATIRI SİL VEYA YORUM SATIRI YAP!!!
         case_sensitive = True
 
 settings = Settings()
